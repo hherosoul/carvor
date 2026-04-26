@@ -81,7 +81,7 @@ async def generate_weekly(
             "id": existing_report.id,
         }
 
-    report_content = await generate_weekly_report(library_id, week_start, session)
+    report_content = await generate_weekly_report(library_id, week_start, week_end, session)
 
     report = WeeklyReport(
         library_id=library_id,

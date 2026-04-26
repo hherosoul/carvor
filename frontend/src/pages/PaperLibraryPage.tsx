@@ -181,10 +181,14 @@ export const PaperLibraryPage: React.FC = () => {
                 <div style={{ marginTop: 4, color: '#444', lineHeight: 1.8 }}>{viewPaper.abstract}</div>
               </div>
             )}
-            {viewPaper.structured_summary && (
+            {viewPaper.source_url && (
               <div style={{ marginBottom: 12 }}>
-                <Text type="secondary" strong>结构化摘要</Text>
-                <div style={{ marginTop: 4, color: '#444', lineHeight: 1.8 }}>{viewPaper.structured_summary}</div>
+                <Text type="secondary" strong>来源</Text>
+                <div style={{ marginTop: 4 }}>
+                  <a href={viewPaper.source_url} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>
+                    {viewPaper.source_url}
+                  </a>
+                </div>
               </div>
             )}
             {viewPaper.deep_reading_summary && (

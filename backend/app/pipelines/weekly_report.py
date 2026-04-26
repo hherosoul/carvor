@@ -8,6 +8,7 @@ from app.gateway.llm_gateway import gateway
 async def generate_weekly_report(
     library_id: int,
     week_start: str,
+    week_end: str,
     session: AsyncSession,
 ) -> str:
     result = await session.execute(
@@ -22,6 +23,7 @@ async def generate_weekly_report(
         .join(PaperLibraryAssoc, PaperLibraryAssoc.paper_id == Paper.id)
         .where(PaperLibraryAssoc.library_id == library_id)
         .where(Paper.published_date >= week_start)
+        .where(Paper.published_date <= week_end)
         .limit(30)
     )
     papers = result.scalars().all()

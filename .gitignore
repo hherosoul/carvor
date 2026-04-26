@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.venv/
+
+# Backend sensitive config
+backend/config/llm_config.json
+
+# Backend data
+backend/data/
+
+# Backend ML model cache
+backend/models/models--BAAI--bge-small-zh-v1.5/
+backend/models/CACHEDIR.TAG
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
