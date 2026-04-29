@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Typography, Tag, Button, List, Modal, Form, Input, Empty, Space, message } from 'antd';
-import { PlusOutlined, RocketOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { confirmDelete, confirmAction } from '../utils/confirm';
+import { confirmDelete } from '../utils/confirm';
 import type { Idea } from '../types';
 
 const { Text, Title } = Typography;
@@ -30,18 +30,6 @@ export const IdeasPage: React.FC = () => {
     setCreateModalOpen(false);
     form.resetFields();
     loadIdeas();
-  };
-
-  const handleApprove = async (e: React.MouseEvent, idea: Idea) => {
-    e.stopPropagation();
-    await api.ideas.updateStatus(idea.id, '已立项');
-    message.success('已立项，正在创建任务...');
-    const task = await api.tasks.create({
-      name: idea.title,
-      source_idea_id: idea.id,
-    });
-    loadIdeas();
-    navigate(`/tasks/${task.id}`);
   };
 
   const handleDelete = async (ideaId: number) => {
@@ -99,13 +87,6 @@ export const IdeasPage: React.FC = () => {
                 {idea.content && (
                   <div style={{ marginTop: 8, color: '#666', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {idea.content}
-                  </div>
-                )}
-                {!isApproved && !isAbandoned && (
-                  <div style={{ marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
-                    <Button size="small" type="primary" icon={<RocketOutlined />} onClick={(e) => handleApprove(e, idea)}>
-                      立项
-                    </Button>
                   </div>
                 )}
               </Card>

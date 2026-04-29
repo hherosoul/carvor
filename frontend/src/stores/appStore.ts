@@ -17,7 +17,7 @@ interface ChatContext {
   existingContent: string;
 }
 
-interface AppStore {
+export interface AppStore {
   currentLibraryId: number | null;
   currentTaskId: number | null;
   currentConversationId: number | null;
@@ -25,6 +25,7 @@ interface AppStore {
   chatHistory: ChatMessage[];
   chatContext: ChatContext;
   chatSending: boolean;
+  ideaChatResult: string;
   setCurrentLibrary: (id: number | null) => void;
   setCurrentTask: (id: number | null) => void;
   setCurrentConversation: (id: number | null) => void;
@@ -35,6 +36,8 @@ interface AppStore {
   clearChatHistory: () => void;
   setChatContext: (ctx: Partial<ChatContext>) => void;
   setChatSending: (sending: boolean) => void;
+  setIdeaChatResult: (content: string) => void;
+  consumeIdeaChatResult: () => string;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -45,6 +48,7 @@ export const useAppStore = create<AppStore>((set) => ({
   chatHistory: [],
   chatContext: { scenario: null, entityId: null, entityTitle: '', existingContent: '' },
   chatSending: false,
+  ideaChatResult: '',
   setCurrentLibrary: (id) => set({ currentLibraryId: id }),
   setCurrentTask: (id) => set({ currentTaskId: id }),
   setCurrentConversation: (id) => set({ currentConversationId: id }),
@@ -65,4 +69,13 @@ export const useAppStore = create<AppStore>((set) => ({
   setChatContext: (ctx) =>
     set((s) => ({ chatContext: { ...s.chatContext, ...ctx } })),
   setChatSending: (sending) => set({ chatSending: sending }),
+  setIdeaChatResult: (content) => set({ ideaChatResult: content }),
+  consumeIdeaChatResult: () => {
+    const state = { result: '' };
+    set((s) => {
+      state.result = s.ideaChatResult;
+      return { ideaChatResult: '' };
+    });
+    return state.result;
+  },
 }));

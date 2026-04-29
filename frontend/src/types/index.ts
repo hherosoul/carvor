@@ -35,6 +35,7 @@ export interface Task {
   name: string;
   research_goal?: string;
   source_idea_id?: number;
+  idea_content?: string;
   created_at: string;
 }
 
@@ -49,6 +50,7 @@ export interface TaskReference {
 export interface Experiment {
   id: number;
   log_path: string;
+  filename?: string;
   analysis_report?: string;
   created_at: string;
 }

@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Typography, Card, Tabs, Table, Button, Space, Upload, message, Tag, Modal, Steps } from 'antd';
-import { DownloadOutlined } from '@ant-design/icons';
+import { Typography, Card, Tabs, Table, Button, Space, Upload, message, Modal, Steps } from 'antd';
+import { DownloadOutlined, DeleteOutlined, EyeOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAppStore, type ChatScenario } from '../stores/appStore';
 import type { Task, TaskReference, Experiment } from '../types';
+import { confirmDelete } from '../utils/confirm';
 import ReactMarkdown from 'react-markdown';
 
 const { Title, Text } = Typography;
@@ -99,6 +100,11 @@ export const TaskDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('references');
   const [bibtexContent, setBibtexContent] = useState('');
   const [bibtexModalOpen, setBibtexModalOpen] = useState(false);
+  const [ideaExpanded, setIdeaExpanded] = useState(false);
+  const [expViewModalOpen, setExpViewModalOpen] = useState(false);
+  const [expViewContent, setExpViewContent] = useState('');
+  const [expViewTitle, setExpViewTitle] = useState('');
+  const [expAnalyzing, setExpAnalyzing] = useState<number | null>(null);
 
   const taskId = Number(id);
 
@@ -231,19 +237,93 @@ export const TaskDetailPage: React.FC = () => {
   ];
 
   const expColumns = [
-    { title: 'ID', dataIndex: 'id', key: 'id' },
-    { title: '日志路径', dataIndex: 'log_path', key: 'log_path', ellipsis: true },
-    { title: '创建时间', dataIndex: 'created_at', key: 'created_at' },
+    {
+      title: '文件名',
+      dataIndex: 'filename',
+      key: 'filename',
+      ellipsis: true,
+      render: (filename: string | undefined, record: Experiment) => {
+        if (filename) return filename;
+        const parts = (record.log_path || '').replace(/\\/g, '/').split('/');
+        return parts[parts.length - 1] || '-';
+      },
+    },
+    { title: '上传时间', dataIndex: 'created_at', key: 'created_at' },
     {
       title: '操作',
       key: 'action',
+      width: 300,
       render: (_: unknown, record: Experiment) => (
-        <Button
-          size="small"
-          onClick={() => api.tasks.analyzeExperiment(taskId, record.id).then((r) => message.info(r.report?.substring(0, 100)))}
-        >
-          分析
-        </Button>
+        <Space size="small" wrap>
+          <Button
+            size="small"
+            type="link"
+            icon={<EyeOutlined />}
+            disabled={!record.analysis_report}
+            onClick={() => {
+              setExpViewContent(record.analysis_report || '');
+              setExpViewTitle(record.filename || `实验 #${record.id}`);
+              setExpViewModalOpen(true);
+            }}
+          >
+            查看
+          </Button>
+          <Button
+            size="small"
+            type="link"
+            icon={<DownloadOutlined />}
+            disabled={!record.analysis_report}
+            onClick={() => {
+              if (!record.analysis_report) return;
+              const blob = new Blob([record.analysis_report], { type: 'text/markdown;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `analysis_${record.filename || record.id}.md`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            导出
+          </Button>
+          <Button
+            size="small"
+            type="link"
+            icon={<ThunderboltOutlined />}
+            loading={expAnalyzing === record.id}
+            onClick={async () => {
+              setExpAnalyzing(record.id);
+              try {
+                const result = await api.tasks.analyzeExperiment(taskId, record.id);
+                if (result.report) {
+                  message.success('AI 分析完成');
+                  api.tasks.experiments(taskId).then(setExperiments);
+                }
+              } catch (err: unknown) {
+                message.error('分析失败：' + (err instanceof Error ? err.message : '未知错误'));
+              } finally {
+                setExpAnalyzing(null);
+              }
+            }}
+          >
+            AI处理
+          </Button>
+          <Button
+            size="small"
+            type="link"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => {
+              confirmDelete('确定删除此实验？', async () => {
+                await api.tasks.deleteExperiment(taskId, record.id);
+                message.success('已删除');
+                api.tasks.experiments(taskId).then(setExperiments);
+              });
+            }}
+          >
+            删除
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -261,10 +341,24 @@ export const TaskDetailPage: React.FC = () => {
   return (
     <div>
       <Title level={4}>{task.name}</Title>
-      {task.research_goal && (
-        <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-          {task.research_goal}
-        </Text>
+      {task.idea_content && (
+        <div style={{ marginBottom: 16, padding: '8px 12px', background: '#f6f8fa', borderRadius: 6, fontSize: 13, color: '#555', lineHeight: 1.6 }}>
+          {ideaExpanded ? (
+            <>
+              <ReactMarkdown>{task.idea_content}</ReactMarkdown>
+              <a onClick={() => setIdeaExpanded(false)} style={{ fontSize: 12 }}>收起</a>
+            </>
+          ) : (
+            <>
+              {task.idea_content.length > 30
+                ? task.idea_content.slice(0, 20) + '...'
+                : task.idea_content}
+              {task.idea_content.length > 30 && (
+                <a onClick={() => setIdeaExpanded(true)} style={{ marginLeft: 4, fontSize: 12 }}>详情</a>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       <Steps
@@ -546,6 +640,28 @@ export const TaskDetailPage: React.FC = () => {
           wordBreak: 'break-all',
         }}>
           {bibtexContent}
+        </pre>
+      </Modal>
+
+      <Modal
+        title={expViewTitle}
+        open={expViewModalOpen}
+        onCancel={() => setExpViewModalOpen(false)}
+        footer={null}
+        width={700}
+      >
+        <pre style={{
+          background: '#f5f5f5',
+          padding: 16,
+          borderRadius: 6,
+          fontSize: 13,
+          lineHeight: 1.6,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all',
+          maxHeight: 500,
+          overflow: 'auto',
+        }}>
+          {expViewContent}
         </pre>
       </Modal>
     </div>

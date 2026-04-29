@@ -19,7 +19,7 @@ const BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    ...(options?.body ? { headers: { 'Content-Type': 'application/json' } } : {}),
     ...options,
   });
   if (!res.ok) {
@@ -68,8 +68,8 @@ export const api = {
 
   weeklyReports: {
     list: (libraryId: number) => request<[]>(`/weekly-reports?library_id=${libraryId}`),
-    generate: (week: string, libraryId: number) =>
-      request<{ week: string; report: string }>(`/weekly-reports/${week}?library_id=${libraryId}`, { method: 'POST' }),
+    generate: (week: string, libraryId: number, force = false) =>
+      request<{ week: string; report: string; created_at: string }>(`/weekly-reports/${week}?library_id=${libraryId}${force ? '&force=true' : ''}`, { method: 'POST' }),
   },
 
   search: {
@@ -146,6 +146,10 @@ export const api = {
     },
     analyzeExperiment: (id: number, expId: number) =>
       request<{ report: string }>(`/tasks/${id}/experiments/${expId}/analyze`, { method: 'POST' }),
+    getExperiment: (id: number, expId: number) =>
+      request<{ id: number; log_content: string; analysis_report: string; filename: string }>(`/tasks/${id}/experiments/${expId}`),
+    deleteExperiment: (id: number, expId: number) =>
+      request<{ ok: boolean }>(`/tasks/${id}/experiments/${expId}`, { method: 'DELETE' }),
     promptDocs: (id: number) => request<{ filename: string; content: string }[]>(`/tasks/${id}/prompt-docs`),
     exportDoc: (id: number, docType: string) => {
       const a = document.createElement('a');

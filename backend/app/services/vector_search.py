@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from app.core.database import async_session
+
 logger = logging.getLogger("carvor.vector_search")
 
 LOCAL_MODEL_PATH = Path(__file__).resolve().parent.parent.parent / "models" / "bge-small-zh-v1.5"
@@ -45,6 +47,12 @@ class VectorSearchService:
         self._ensure_init()
         if not self._embed_model:
             return False
+
+        return self._load_index_only()
+
+    def _load_index_only(self):
+        if self._index_loaded:
+            return True
 
         try:
             from llama_index.core import StorageContext, load_index_from_storage
@@ -188,7 +196,7 @@ class VectorSearchService:
             logger.warning(f"Failed to add paper to index, rebuilding: {e}")
             await self.rebuild_index_from_db(session)
 
-    def _search_sync(self, query: str, top_k: int) -> list[dict]:
+    def _search_sync(self, query: str, top_k: int, similarity_cutoff: Optional[float] = None) -> list[dict]:
         self._ensure_init()
         if not self._embed_model:
             return []
@@ -203,7 +211,10 @@ class VectorSearchService:
             self._load_doc_map()
 
         try:
-            retriever = self._index.as_retriever(similarity_top_k=top_k)
+            if similarity_cutoff is not None:
+                retriever = self._index.as_retriever(similarity_top_k=top_k, similarity_cutoff=similarity_cutoff)
+            else:
+                retriever = self._index.as_retriever(similarity_top_k=top_k)
             nodes = retriever.retrieve(query)
 
             results = []
@@ -226,16 +237,14 @@ class VectorSearchService:
             logger.warning(f"Vector search failed: {e}")
             return []
 
-    async def remove_paper(self, paper_id: int, session):
-        self._ensure_init()
-        if not self._embed_model:
-            return
-
+    def _remove_paper_sync(self, paper_id: int):
+        if not self._doc_map:
+            self._load_doc_map()
         self._doc_map.pop(paper_id, None)
         self._save_doc_map()
 
         if not self._index_loaded:
-            self._load_persisted_index_sync()
+            self._load_index_only()
 
         if not self._index:
             return
@@ -255,12 +264,17 @@ class VectorSearchService:
             else:
                 logger.info(f"No vector nodes found for paper {paper_id}, skipping removal")
         except Exception as e:
-            logger.warning(f"Failed to remove paper from index, rebuilding: {e}")
-            await self.rebuild_index_from_db(session)
+            logger.warning(f"Failed to remove paper from index: {e}")
+            self._index = None
+            self._index_loaded = False
 
-    async def search(self, query: str, top_k: int = 5) -> list[dict]:
+    async def remove_paper(self, paper_id: int):
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._search_sync, query, top_k)
+        await loop.run_in_executor(None, self._remove_paper_sync, paper_id)
+
+    async def search(self, query: str, top_k: int = 5, similarity_cutoff: Optional[float] = None) -> list[dict]:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._search_sync, query, top_k, similarity_cutoff)
 
 
 def get_vector_service() -> VectorSearchService:

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from typing import Optional
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import PlainTextResponse, StreamingResponse
@@ -190,9 +191,9 @@ async def delete_paper(paper_id: int, session: AsyncSession = Depends(get_sessio
 
     vs = get_vector_service()
     try:
-        await vs.remove_paper(paper_id, session)
+        asyncio.create_task(vs.remove_paper(paper_id))
     except Exception as e:
-        logger.warning(f"Failed to remove paper {paper_id} from RAG: {e}")
+        logger.warning(f"Failed to trigger RAG removal for paper {paper_id}: {e}")
 
     await session.execute(delete(PaperLibraryAssoc).where(PaperLibraryAssoc.paper_id == paper_id))
     await session.execute(delete(PaperNote).where(PaperNote.paper_id == paper_id))
@@ -307,6 +308,7 @@ class SemanticSearchRequest(BaseModel):
     query: str
     library_id: int
     top_k: int = 5
+    similarity_cutoff: Optional[float] = 0.6
 
 
 @router.post("/semantic-search")
@@ -316,7 +318,7 @@ async def semantic_search(data: SemanticSearchRequest, session: AsyncSession = D
     vs = get_vector_service()
     vector_results = []
     try:
-        vector_results = await vs.search(data.query, top_k=data.top_k)
+        vector_results = await vs.search(data.query, top_k=data.top_k, similarity_cutoff=data.similarity_cutoff)
         if not vector_results:
             result = await session.execute(
                 select(Paper)

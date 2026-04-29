@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Typography, Tag, Spin, Empty, Button, Upload, message, Input, Space, Modal, Form, InputNumber, Steps } from 'antd';
 import { UploadOutlined, RocketOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, type AppStore } from '../stores/appStore';
 import { api } from '../services/api';
 import type { WeekInfo } from '../types';
 
@@ -11,7 +11,7 @@ const { TextArea } = Input;
 
 export const TimelinePage: React.FC = () => {
   const navigate = useNavigate();
-  const currentLibraryId = useAppStore((s) => s.currentLibraryId);
+  const currentLibraryId = useAppStore((s: AppStore) => s.currentLibraryId);
   const [weeks, setWeeks] = useState<WeekInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);

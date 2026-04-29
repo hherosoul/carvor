@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Typography, Card, Tag, Button, Space, message } from 'antd';
-import { DeleteOutlined, RocketOutlined } from '@ant-design/icons';
+import React, { useEffect, useState, useRef } from 'react';
+import { Typography, Card, Tag, Button, Space, message, Input } from 'antd';
+import { DeleteOutlined, RocketOutlined, SaveOutlined, EditOutlined, ExportOutlined, EyeOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAppStore } from '../stores/appStore';
@@ -13,13 +13,18 @@ const { Title } = Typography;
 export const IdeaDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { setChatContext, openChatPanel, clearChatHistory } = useAppStore();
+  const { setChatContext, openChatPanel, clearChatHistory, ideaChatResult, consumeIdeaChatResult } = useAppStore();
   const [idea, setIdea] = useState<Idea | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [saving, setSaving] = useState(false);
+  const prevResultRef = useRef('');
 
   useEffect(() => {
     if (!id) return;
     api.ideas.get(Number(id)).then((data) => {
       setIdea(data);
+      setEditContent(data.content || '');
       setChatContext({
         scenario: 'idea_refine',
         entityId: data.id,
@@ -31,6 +36,15 @@ export const IdeaDetailPage: React.FC = () => {
       setChatContext({ scenario: null, entityId: null, entityTitle: '' });
     };
   }, [id]);
+
+  useEffect(() => {
+    if (ideaChatResult && ideaChatResult !== prevResultRef.current && idea) {
+      prevResultRef.current = ideaChatResult;
+      setEditContent(ideaChatResult);
+      setEditing(true);
+      consumeIdeaChatResult();
+    }
+  }, [ideaChatResult, idea, consumeIdeaChatResult]);
 
   const handleApprove = async () => {
     if (!id) return;
@@ -67,6 +81,36 @@ export const IdeaDetailPage: React.FC = () => {
     openChatPanel();
   };
 
+  const handleSave = async () => {
+    if (!id) return;
+    setSaving(true);
+    try {
+      await api.ideas.update(Number(id), { content: editContent });
+      setIdea(prev => prev ? { ...prev, content: editContent } : prev);
+      setEditing(false);
+      message.success('内容已保存');
+    } catch {
+      message.error('保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleExport = () => {
+    const content = editing ? editContent : (idea?.content || '');
+    if (!content) {
+      message.warning('暂无内容可导出');
+      return;
+    }
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${idea?.title || 'idea'}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!idea) return null;
 
   const isApproved = idea.status === '已立项';
@@ -101,11 +145,44 @@ export const IdeaDetailPage: React.FC = () => {
         </Space>
       </div>
 
-      <Card>
+      <Card
+        extra={
+          <Space>
+            {editing ? (
+              <>
+                <Button size="small" icon={<EyeOutlined />} onClick={() => setEditing(false)}>
+                  预览
+                </Button>
+                <Button size="small" type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
+                  保存
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(true)}>
+                  编辑
+                </Button>
+                <Button size="small" icon={<ExportOutlined />} onClick={handleExport}>
+                  导出
+                </Button>
+              </>
+            )}
+          </Space>
+        }
+      >
         <div style={{ minHeight: 400 }}>
-          <ReactMarkdown>
-            {idea.content || '*暂无内容，点击"与AI讨论"开始锤炼你的idea*'}
-          </ReactMarkdown>
+          {editing ? (
+            <Input.TextArea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              autoSize={{ minRows: 16, maxRows: 40 }}
+              style={{ fontFamily: 'monospace' }}
+            />
+          ) : (
+            <ReactMarkdown>
+              {editContent || '*暂无内容，点击"与AI讨论"开始锤炼你的idea*'}
+            </ReactMarkdown>
+          )}
         </div>
       </Card>
     </div>

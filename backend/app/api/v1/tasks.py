@@ -74,7 +74,13 @@ async def get_task(task_id: int, session: AsyncSession = Depends(get_session)):
     task = result.scalar_one_or_none()
     if not task:
         raise HTTPException(404, "Task not found")
-    return {"id": task.id, "name": task.name, "research_goal": task.research_goal, "source_idea_id": task.source_idea_id, "created_at": task.created_at}
+    idea_content = None
+    if task.source_idea_id:
+        idea_result = await session.execute(select(Idea).where(Idea.id == task.source_idea_id))
+        idea = idea_result.scalar_one_or_none()
+        if idea:
+            idea_content = idea.content
+    return {"id": task.id, "name": task.name, "research_goal": task.research_goal, "source_idea_id": task.source_idea_id, "idea_content": idea_content, "created_at": task.created_at}
 
 
 @router.delete("/{task_id}")
@@ -368,7 +374,7 @@ async def list_experiments(task_id: int, session: AsyncSession = Depends(get_ses
         select(Experiment).where(Experiment.task_id == task_id).order_by(Experiment.created_at.desc())
     )
     exps = result.scalars().all()
-    return [{"id": e.id, "log_path": e.log_path, "analysis_report": e.analysis_report, "created_at": e.created_at} for e in exps]
+    return [{"id": e.id, "log_path": e.log_path, "filename": Path(e.log_path).name if e.log_path else "", "analysis_report": e.analysis_report, "created_at": e.created_at} for e in exps]
 
 
 @router.post("/{task_id}/experiments")
@@ -395,6 +401,31 @@ async def upload_experiment(
 async def analyze_exp(exp_id: int, session: AsyncSession = Depends(get_session)):
     report = await analyze_experiment(exp_id, session)
     return {"report": report}
+
+
+@router.get("/{task_id}/experiments/{exp_id}")
+async def get_experiment(exp_id: int, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(Experiment).where(Experiment.id == exp_id))
+    exp = result.scalar_one_or_none()
+    if not exp:
+        raise HTTPException(404, "Experiment not found")
+    log_path = Path(exp.log_path)
+    log_content = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
+    return {"id": exp.id, "log_content": log_content, "analysis_report": exp.analysis_report, "filename": log_path.name}
+
+
+@router.delete("/{task_id}/experiments/{exp_id}")
+async def delete_experiment(exp_id: int, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(Experiment).where(Experiment.id == exp_id))
+    exp = result.scalar_one_or_none()
+    if not exp:
+        raise HTTPException(404, "Experiment not found")
+    log_path = Path(exp.log_path)
+    if log_path.exists():
+        log_path.unlink()
+    await session.delete(exp)
+    await session.commit()
+    return {"ok": True}
 
 
 @router.get("/{task_id}/prompt-docs")

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Card, List, Spin, Empty } from 'antd';
+import { Typography, Card, List, Spin, Empty, Button, Space } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
 import { api } from '../services/api';
 import { useAppStore } from '../stores/appStore';
 import type { WeekInfo } from '../types';
@@ -13,6 +14,7 @@ export const WeeklyReportPage: React.FC = () => {
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [selectedWeekRange, setSelectedWeekRange] = useState<{ start: string; end: string } | null>(null);
   const [report, setReport] = useState<string>('');
+  const [reportCreatedAt, setReportCreatedAt] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -27,8 +29,23 @@ export const WeeklyReportPage: React.FC = () => {
     try {
       const result = await api.weeklyReports.generate(w.week, currentLibraryId!);
       setReport(result.report || '');
+      setReportCreatedAt(result.created_at || '');
     } catch {
       setReport('');
+      setReportCreatedAt('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForceUpdate = async () => {
+    if (!selectedWeek || !currentLibraryId) return;
+    setLoading(true);
+    try {
+      const result = await api.weeklyReports.generate(selectedWeek, currentLibraryId, true);
+      setReport(result.report || '');
+      setReportCreatedAt(result.created_at || '');
+    } catch {
     } finally {
       setLoading(false);
     }
@@ -67,7 +84,19 @@ export const WeeklyReportPage: React.FC = () => {
         <div style={{ flex: 1 }}>
           {selectedWeek ? (
             <Card
-              title={`周报：${selectedWeek}${selectedWeekRange ? ` (${selectedWeekRange.start} ~ ${selectedWeekRange.end})` : ''}`}
+              title={
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>周报：{selectedWeek}{selectedWeekRange ? ` (${selectedWeekRange.start} ~ ${selectedWeekRange.end})` : ''}</span>
+                  <Space>
+                    {reportCreatedAt && (
+                      <Text type="secondary" style={{ fontSize: 12 }}>更新于 {reportCreatedAt}</Text>
+                    )}
+                    <Button size="small" icon={<ReloadOutlined />} onClick={handleForceUpdate} loading={loading}>
+                      更新
+                    </Button>
+                  </Space>
+                </div>
+              }
               loading={loading}
             >
               {report ? (

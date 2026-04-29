@@ -35,6 +35,8 @@ export const AppShell: React.FC = () => {
     toggleLeftNav,
     setCurrentLibrary,
     setCurrentTask,
+    clearChatHistory,
+    setChatContext,
   } = useAppStore();
 
   const [libraries, setLibraries] = useState<PaperLibrary[]>([]);
@@ -70,6 +72,11 @@ export const AppShell: React.FC = () => {
     if (location.pathname.startsWith('/tasks/')) {
       loadTasks();
     }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    clearChatHistory();
+    setChatContext({ scenario: null, entityId: null, entityTitle: '', existingContent: '' });
   }, [location.pathname]);
 
   const globalMenuItems = [

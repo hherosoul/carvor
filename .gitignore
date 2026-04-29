@@ -15,7 +15,8 @@ backend/config/llm_config.json
 # Backend data
 backend/data/
 
-# Backend ML model cache
+# Backend ML models
+backend/models/bge-small-zh-v1.5/
 backend/models/models--BAAI--bge-small-zh-v1.5/
 backend/models/CACHEDIR.TAG
 

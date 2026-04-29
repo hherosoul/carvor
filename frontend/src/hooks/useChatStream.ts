@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, type AppStore } from '../stores/appStore';
 
 export function useChatStream() {
-  const appendChatMessage = useAppStore((s) => s.appendChatMessage);
-  const updateLastAssistantMessage = useAppStore((s) => s.updateLastAssistantMessage);
-  const setChatSending = useAppStore((s) => s.setChatSending);
-  const setCurrentConversation = useAppStore((s) => s.setCurrentConversation);
+  const appendChatMessage = useAppStore((s: AppStore) => s.appendChatMessage);
+  const updateLastAssistantMessage = useAppStore((s: AppStore) => s.updateLastAssistantMessage);
+  const setChatSending = useAppStore((s: AppStore) => s.setChatSending);
+  const setCurrentConversation = useAppStore((s: AppStore) => s.setCurrentConversation);
 
   const sendChat = useCallback(
     async (scenario: string, payload: Record<string, unknown>) => {
@@ -49,7 +49,13 @@ export function useChatStream() {
                 } else if (currentEvent === 'chunk' && data.content) {
                   updateLastAssistantMessage(data.content);
                 } else if (currentEvent === 'done') {
-                  // stream complete
+                  if (scenario === 'idea_refine') {
+                    const finalHistory = useAppStore.getState().chatHistory;
+                    const lastAssistant = [...finalHistory].reverse().find(m => m.role === 'assistant');
+                    if (lastAssistant?.content && !lastAssistant.content.includes('[Error:')) {
+                      useAppStore.getState().setIdeaChatResult(lastAssistant.content);
+                    }
+                  }
                 } else if (currentEvent === 'error') {
                   updateLastAssistantMessage(`\n[Error: ${data.message || 'Unknown error'}]`);
                 }

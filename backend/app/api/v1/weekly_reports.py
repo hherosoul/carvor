@@ -59,6 +59,7 @@ async def list_weekly_reports(library_id: int = Query(...), session: AsyncSessio
 async def generate_weekly(
     week: str,
     library_id: int = Query(...),
+    force: bool = Query(False),
     session: AsyncSession = Depends(get_session),
 ):
     wr = _week_range_from_str(week)
@@ -71,15 +72,22 @@ async def generate_weekly(
             WeeklyReport.week_start == week_start,
         )
     )
-    existing_report = existing.scalar_one_or_none()
-    if existing_report:
+    existing_reports = existing.scalars().all()
+    if existing_reports and not force:
+        r = existing_reports[0]
         return {
             "week": week,
             "week_start": week_start,
             "week_end": week_end,
-            "report": existing_report.content,
-            "id": existing_report.id,
+            "report": r.content,
+            "id": r.id,
+            "created_at": r.created_at,
         }
+
+    if existing_reports:
+        for r in existing_reports:
+            await session.delete(r)
+        await session.commit()
 
     report_content = await generate_weekly_report(library_id, week_start, week_end, session)
 
@@ -98,4 +106,5 @@ async def generate_weekly(
         "week_end": week_end,
         "report": report_content,
         "id": report.id,
+        "created_at": report.created_at,
     }
